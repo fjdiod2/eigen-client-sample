@@ -190,7 +190,7 @@ async function waitForConnection(setWebsocket, setInterrupt, spawnResults, token
 }
 
 
-async function createSession(setWebsocket, setToken, setInterrupt) {
+async function createSession(setWebsocket, setToken, setInterrupt, setIID) {
 
   //request to start a new session
   console.log("SPAWN", `Bearer ${eigenKey}`, eigenKey)
@@ -202,6 +202,7 @@ async function createSession(setWebsocket, setToken, setInterrupt) {
     console.log("Something went wrong");
     return
   }
+  setIID(spawnResults.iid);
   // get access token for new session
   const tokenParams = new URLSearchParams({
                                                   expire_time: 120,
@@ -218,13 +219,25 @@ async function createSession(setWebsocket, setToken, setInterrupt) {
 }
 
 
+async function killSession(iid) {
+    // stop session
+    if (iid !== null) {
+        await fetch(`${baseURL}/kill/${iid}`, {
+            headers: {"authorization": `Bearer ${eigenKey}`},
+            method: "GET"
+        })
+    }
+}
+
+
 function VoiceChat({ started }) {
   const [token, setToken] = useState(null);
+  const [iid, setIID] = useState(null);
   const [interrupt, setInterrupt] = useState(false);
   const [websocket, setWebsocket] = useState(null);
   useEffect(() => {
       if (started) {
-          createSession(setWebsocket, setToken, setInterrupt);
+          createSession(setWebsocket, setToken, setInterrupt, setIID);
           // initSocket(setWebsocket, setInterrupt);
       }
   }, []);
@@ -254,7 +267,9 @@ function VoiceChat({ started }) {
     }
   }, [websocket]);
   return (
-      <div></div>
+      <div>
+          <button onClick={() => {killSession()}}>Stop Session</button>
+      </div>
   )
 }
 
@@ -267,7 +282,9 @@ function App() {
             setStarted(true)}}>Start
             </button>
             :
-            <VoiceChat started={started}/>
+            <div>
+                <VoiceChat started={started}/>
+            </div>
         }
     </div>
   );
