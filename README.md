@@ -32,19 +32,19 @@ Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
 
 ### Websocket messages
-####Init:
+#### Init:
 `{"type": "init", "token": access_token, "agent_id": id}`
-####Audio data message
+#### Audio data message
 `{"type": "data", "data": base64_encoded_audio}`
 
 Audio should be 16000 samples per second base64 encoded
 
 ### Websocket response messages
 
-####Init response
+#### Init response
 If successful: `{"status": "ok"}`
 If auth failed: `{"status": "error", "message": error_message}`
-####Data response
+#### Data response
 `{"reply_text": reply_text, "audio": audio, "interrupt": interrupt, "chunk_count": count, "id": reply_id}`
 some of the fields may be missing in some responses(e.g. reply_text will first appear without audio).
 
