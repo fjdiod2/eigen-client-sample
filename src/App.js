@@ -64,11 +64,15 @@ function getChunk(chunk) {
 
 function websocketListener(event, setInterrupt) {
     //process messages from the socket
-    const {reply_text, audio,
+    const {reply_text, audio, status, message,
            interrupt,} = JSON.parse(event.data);
 
     if(reply_text !== undefined && reply_text !== null) {
         console.log("TRANSCRIPT", reply_text);
+    }
+
+    if(status !== undefined && status !== null) {
+        console.log("ERROR", status, message)
     }
 
     if(interrupt !== undefined && interrupt !== null) {
@@ -157,7 +161,7 @@ function downsampleBuffer(buffer, sampleRate, outSampleRate) {
 
 async function initSocket(setWebsocket, setInterrupt) {
       console.log(`wss://${url}:${portTest}`)
-      const websocket = new WebSocket(`wss://stream296b3a498c784424ad0790cb61c50d4f.chadview.com:9001`);
+      const websocket = new WebSocket(`wss://${url}:${portTest}`);
       websocket.addEventListener("message", (event) => {
           websocketListener(event, setInterrupt);
       });
@@ -179,6 +183,7 @@ async function waitForConnection(setWebsocket, setInterrupt, spawnResults, token
                 websocketListener(event, setInterrupt);
             });
             await waitForOpenConnection(websocket);
+            console.log("send", JSON.stringify({type: "init", token: token.token, agent_id: agentId}), `wss://${spawnStatus.domain}:${spawnStatus.port}`)
             websocket.send(JSON.stringify({type: "init", token: token.token, agent_id: agentId}));
             setWebsocket(websocket);
             //init message
@@ -193,7 +198,6 @@ async function waitForConnection(setWebsocket, setInterrupt, spawnResults, token
 async function createSession(setWebsocket, setToken, setInterrupt, setIID) {
 
   //request to start a new session
-  console.log("SPAWN", `Bearer ${eigenKey}`, eigenKey)
   const spawnResults = await (await fetch(`${baseURL}/spawn`, {
                                     headers: {"authorization": `Bearer ${eigenKey}`},
                                     method: "POST"})).json();
@@ -221,6 +225,7 @@ async function createSession(setWebsocket, setToken, setInterrupt, setIID) {
 
 async function killSession(iid) {
     // stop session
+    console.log("killing", iid)
     if (iid !== null) {
         await fetch(`${baseURL}/kill/${iid}`, {
             headers: {"authorization": `Bearer ${eigenKey}`},
@@ -268,7 +273,7 @@ function VoiceChat({ started }) {
   }, [websocket]);
   return (
       <div>
-          <button onClick={() => {killSession()}}>Stop Session</button>
+          <button onClick={() => {killSession(iid)}}>Stop Session</button>
       </div>
   )
 }
