@@ -29,7 +29,7 @@ Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 5. Capture user's microphone and send audio as it becomes available. Service is expecting audio to be 16 kHz sample rate and base64 encoded
 6. As you receive audio from the bot schedule it to be played(after precious responses have been played)
 7. You may receive "interrupt": true field in your response. It's means that the user have interrupted agent, so you should stop playing current audio chunk and remove any chunks scheduled to play after that.
-
+8. Stop the session with /kill/{ID} method.
 
 ### Websocket messages
 #### Init:
