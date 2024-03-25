@@ -3,7 +3,7 @@ import './App.css';
 import { useState, useEffect } from "react";
 
 const eigenKey = "";//API key
-const agentId = "";//
+const agentId = "837404feccfd421ba90811efa5c41322";//
 const baseURL = "https://eigenchat.com/api";
 const sampleRate = 16000;//sample rate of returned audio
 
@@ -11,8 +11,8 @@ const sampleRate = 16000;//sample rate of returned audio
 let nextTime = 0;
 let context = new window.AudioContext();
 const ltok = "";// to test existing session past access token here
-const url = "";// to test existing session past url token here
-const portTest = null;// to test existing session past url token here
+const url = "streamaaa.chadview.com";// to test existing session past url token here
+const portTest = 9001;// to test existing session past url token here
 if (navigator.audioSession !== undefined) {
     navigator.audioSession.type = 'play-and-record';
 }
@@ -160,13 +160,20 @@ function downsampleBuffer(buffer, sampleRate, outSampleRate) {
 }
 
 async function initSocket(setWebsocket, setInterrupt) {
-      console.log(`wss://${url}:${portTest}`)
+      const tokenParams = new URLSearchParams({
+                                                      expire_time: 120,
+                                                      iid: "aaa",
+                                                  });
+      const token = await (await fetch(`${baseURL}/token?` + tokenParams, {
+                                        headers: {"authorization": `Bearer ${eigenKey}`},
+                                        })).json();
+      console.log(`wss://${url}:${portTest}`, token.token)
       const websocket = new WebSocket(`wss://${url}:${portTest}`);
       websocket.addEventListener("message", (event) => {
           websocketListener(event, setInterrupt);
       });
       await waitForOpenConnection(websocket);
-      websocket.send(JSON.stringify({type: "init", token: ltok, agent_id: agentId}));
+      websocket.send(JSON.stringify({type: "init", token: token.token, agent_id: agentId}));
       setWebsocket(websocket);
 }
 
@@ -242,8 +249,8 @@ function VoiceChat({ started }) {
   const [websocket, setWebsocket] = useState(null);
   useEffect(() => {
       if (started) {
-          createSession(setWebsocket, setToken, setInterrupt, setIID);
-          // initSocket(setWebsocket, setInterrupt);
+          //createSession(setWebsocket, setToken, setInterrupt, setIID);
+          initSocket(setWebsocket, setInterrupt);
       }
   }, []);
   useEffect(() => {
