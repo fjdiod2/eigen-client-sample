@@ -2,7 +2,7 @@ import logo from './logo.svg';
 import './App.css';
 import { useState, useEffect } from "react";
 
-const eigenKey = "";//API key
+const eigenKey = process.env.REACT_APP_EIGEN_KEY;//API key
 const agentId = "837404feccfd421ba90811efa5c41322";//
 const baseURL = "https://eigenchat.com/api";
 const sampleRate = 16000;//sample rate of returned audio
