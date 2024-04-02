@@ -72,7 +72,7 @@ function websocketListener(event, setInterrupt) {
     }
 
     if(status !== undefined && status !== null) {
-        console.log("ERROR", status, message)
+        console.log("ERROR", status, message);
     }
 
     if(interrupt !== undefined && interrupt !== null) {
@@ -271,6 +271,17 @@ function VoiceChat({ started }) {
         })
     }
   }, [websocket]);
+
+  useEffect(() => {
+    if(source !== null) {
+        if (interrupt) {
+            for (let i=0; i<source.length;i++) {
+                source[i].stop();
+            }
+            source = [];
+        }
+    }
+}, [interrupt])
   return (
       <div>
           <button onClick={() => {killSession(iid)}}>Stop Session</button>
