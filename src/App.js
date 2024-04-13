@@ -348,7 +348,7 @@ function App() {
             </button>
             :
             <div>
-                <VoiceChat started={started}/>
+                <VoiceChat started={started} agentID={agentId}/>
             </div>
         }
     </div>
