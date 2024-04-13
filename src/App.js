@@ -5,14 +5,14 @@ import { useState, useEffect } from "react";
 const eigenKey = "";//API key
 const agentId = "";//
 const baseURL = "https://eigenchat.com/api";
-const sampleRate = 16000;//sample rate of returned audio
+let sampleRate = 24000;//sample rate of returned audio
 
 
 let nextTime = 0;
 let context = new window.AudioContext();
 const ltok = "";// to test existing session past access token here
-const url = "";// to test existing session past url token here
-const portTest = null;// to test existing session past url token here
+const url = "streamaaa.chadview.com";// to test existing session past url token here
+const portTest = 9001;// to test existing session past url token here
 if (navigator.audioSession !== undefined) {
     navigator.audioSession.type = 'play-and-record';
 }
@@ -42,9 +42,10 @@ function base2array(text) {
 }
 
 
-function getChunk(chunk) {
+function getChunk(chunk, setFinished) {
     // create BufferSource with audio response
     console.log("PLAYING CHUNK", Date.now());
+    setFinished(false);
     let buffer = null;
     const size = chunk.length;
     buffer = context.createBuffer(2, size, sampleRate);
@@ -54,6 +55,9 @@ function getChunk(chunk) {
     tmp.buffer = buffer;
     tmp.addEventListener("ended", () => {
         source.shift();
+        if (source.length === 0) {
+            setFinished(true);
+        }
     });
 
     tmp.connect(gainNode);
@@ -62,26 +66,43 @@ function getChunk(chunk) {
 }
 
 
-function websocketListener(event, setInterrupt) {
+function websocketListener(event, setInterrupt, setFinished, setGenerating) {
     //process messages from the socket
-    const {reply_text, audio, status, message,
+    const {reply_text, audio, status, message, finished, generating, sample_rate,
            interrupt,} = JSON.parse(event.data);
 
     if(reply_text !== undefined && reply_text !== null) {
         console.log("TRANSCRIPT", reply_text);
     }
 
-    if(status !== undefined && status !== null) {
+    if(sample_rate !== undefined && sample_rate !== null) {
+        console.log("SAMPLE RATE", sample_rate);
+        sampleRate = sample_rate;
+    }
+
+    if(generating !== undefined && generating !== null) {
+        setGenerating(true);
+        setInterrupt(false);
+        console.log("GENERATING");
+    }
+
+    if(finished !== undefined && finished !== null) {
+        setGenerating(false);
+        console.log("GENERATION FINISHED");
+    }
+
+    if(status !== undefined && status !== null && status !== "ok") {
         console.log("ERROR", status, message);
     }
 
     if(interrupt !== undefined && interrupt !== null) {
+        console.log("INTERRUPTED");
         setInterrupt(true);
     }
     if(audio !== undefined && audio !== null) {
         const tmp = base2array(audio);
         const nw = context.currentTime;
-        const chunk = getChunk(tmp);
+        const chunk = getChunk(tmp, setFinished);
 
         if (nextTime === 0) {
             nextTime = context.currentTime + 0.05;
@@ -159,19 +180,26 @@ function downsampleBuffer(buffer, sampleRate, outSampleRate) {
     return result.buffer;
 }
 
-async function initSocket(setWebsocket, setInterrupt) {
-      console.log(`wss://${url}:${portTest}`)
+async function initSocket(url, port, setWebsocket, setInterrupt, agentID, setFinished, setGenerating) {
+      const tokenParams = new URLSearchParams({
+                                                      expire_time: 120,
+                                                      iid: "aaa",
+                                                  });
+      const token = await (await fetch(`${baseURL}/token?` + tokenParams, {
+                                        headers: {"authorization": `Bearer ${eigenKey}`},
+                                        })).json();
+      console.log(`wss://${url}:${port}`, token.token)
       const websocket = new WebSocket(`wss://${url}:${portTest}`);
       websocket.addEventListener("message", (event) => {
-          websocketListener(event, setInterrupt);
+          websocketListener(event, setInterrupt, setFinished, setGenerating);
       });
       await waitForOpenConnection(websocket);
-      websocket.send(JSON.stringify({type: "init", token: ltok, agent_id: agentId}));
+      websocket.send(JSON.stringify({type: "init", token: token.token, agent_id: agentID}));
       setWebsocket(websocket);
 }
 
 
-async function waitForConnection(setWebsocket, setInterrupt, spawnResults, token) {
+async function waitForConnection(setWebsocket, agentID, setInterrupt, spawnResults, token, setFinished, setGenerating) {
     while (true) {
         const spawnStatus = await (await fetch(`${baseURL}/status/${spawnResults.iid}`, {
             headers: {"authorization": `Bearer ${eigenKey}`}
@@ -180,11 +208,11 @@ async function waitForConnection(setWebsocket, setInterrupt, spawnResults, token
         if (spawnStatus.status === "ok") {
             const websocket = new WebSocket(`wss://${spawnStatus.domain}:${spawnStatus.port}`);
             websocket.addEventListener("message", (event) => {
-                websocketListener(event, setInterrupt);
+                websocketListener(event, setInterrupt, setFinished, setGenerating);
             });
             await waitForOpenConnection(websocket);
-            console.log("send", JSON.stringify({type: "init", token: token.token, agent_id: agentId}), `wss://${spawnStatus.domain}:${spawnStatus.port}`)
-            websocket.send(JSON.stringify({type: "init", token: token.token, agent_id: agentId}));
+            console.log("send", agentID, JSON.stringify({type: "init", agent_id: agentID}), `wss://${spawnStatus.domain}:${spawnStatus.port}`)
+            websocket.send(JSON.stringify({type: "init", token: token.token, agent_id: agentID}));
             setWebsocket(websocket);
             //init message
 
@@ -195,7 +223,7 @@ async function waitForConnection(setWebsocket, setInterrupt, spawnResults, token
 }
 
 
-async function createSession(setWebsocket, setToken, setInterrupt, setIID) {
+async function createSession(setWebsocket, setToken, setInterrupt, setIID, agentID, setFinished, setGenerating) {
 
   //request to start a new session
   const spawnResults = await (await fetch(`${baseURL}/spawn`, {
@@ -218,7 +246,7 @@ async function createSession(setWebsocket, setToken, setInterrupt, setIID) {
   // const token = await tokenResponse.json();
   setToken(token.token);
   //wait for creation of session
-  await waitForConnection(setWebsocket, setInterrupt, spawnResults, token);
+  await waitForConnection(setWebsocket, agentID, setInterrupt, spawnResults, token, setFinished, setGenerating);
 
 }
 
@@ -235,17 +263,28 @@ async function killSession(iid) {
 }
 
 
-function VoiceChat({ started }) {
+function VoiceChat({ started, agentID }) {
   const [token, setToken] = useState(null);
   const [iid, setIID] = useState(null);
   const [interrupt, setInterrupt] = useState(false);
   const [websocket, setWebsocket] = useState(null);
+  const [finished, setFinished] = useState(false);
+  const [generating, setGenerating] = useState(false);
   useEffect(() => {
       if (started) {
-          createSession(setWebsocket, setToken, setInterrupt, setIID);
-          // initSocket(setWebsocket, setInterrupt);
+          createSession(setWebsocket, setToken, setInterrupt, setIID, agentID, setFinished, setGenerating);
+          // initSocket(url, portTest, setWebsocket, setInterrupt, agentID, setFinished, setGenerating);
       }
   }, []);
+
+  useEffect(() => {
+      console.log("audio_play_finished?", finished, generating)
+      if (finished && !generating) {
+          console.log("audio_play_finished")
+          websocket.send(JSON.stringify({type: "audio_play_finished"}));
+      }
+  }, [finished, generating])
+
   useEffect(() => {
     if (websocket !== null) {
         //when connection is opened and inited
@@ -272,16 +311,26 @@ function VoiceChat({ started }) {
     }
   }, [websocket]);
 
-  useEffect(() => {
-    if(source !== null) {
-        if (interrupt) {
-            for (let i=0; i<source.length;i++) {
-                source[i].stop();
+    useEffect(() => {
+        if(source !== null) {
+            if (interrupt) {
+                console.log("stopping sound", source.length);
+                for (let i=0; i<source.length;i++) {
+                    source[i].stop();
+                }
+                source = [];
+                nextTime = 0;
             }
-            source = [];
         }
-    }
-}, [interrupt])
+    }, [interrupt])
+
+    useEffect(() => {
+        if(websocket !== null) {
+            websocket.close();
+            initSocket(url, portTest, setWebsocket, setInterrupt, agentID);
+        }
+    }, [agentID])
+
   return (
       <div>
           <button onClick={() => {killSession(iid)}}>Stop Session</button>
